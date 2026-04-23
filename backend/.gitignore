@@ -1,0 +1,37 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.venv/
+env/
+venv/
+ENV/
+
+# --- Environment Variables ---
+# We keep the template, but ignore the actual secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# --- Databases / Migrations ---
+# If you use SQLite for local dev
+*.db
+*.sqlite3
+
+# --- Docker ---
+# Ignore data persisted by docker-compose volumes if you map them locally
+.docker-data/
+
+# --- OS / IDE ---
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# --- App Specific ---
+# Ignore local storage or uploaded files if using the storage service locally
+app/services/storage/local_uploads/

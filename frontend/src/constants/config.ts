@@ -1,5 +1,5 @@
 export const API_BASE_URL = __DEV__
-  ? 'http://192.168.1.x:8000' // replace with your local IP
+  ? 'http://127.0.0.1:8000' // replace with your local IP
   : 'https://api.yourapp.com';
 
 export const ANOMALY_THRESHOLD = 1.3; // 30% above average
