@@ -35,3 +35,6 @@ ENV/
 # --- App Specific ---
 # Ignore local storage or uploaded files if using the storage service locally
 app/services/storage/local_uploads/
+
+# GCP service account key — SECRET
+gcp-key.json

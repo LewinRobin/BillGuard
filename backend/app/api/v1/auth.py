@@ -7,14 +7,16 @@ from app.core.security import (
     generate_otp, create_access_token, create_refresh_token, decode_token
 )
 from app.models.user import User
-from app.schemas.auth import OtpRequest, OtpVerify, TokenResponse, RefreshRequest
+from app.schemas.auth import (
+    OtpRequest, OtpVerify, TokenResponse, RefreshRequest, UserOut, ApiResponse
+)
 from app.services.email import send_otp_email
 from app.core.config import settings
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/request-otp", status_code=status.HTTP_200_OK)
+@router.post("/request-otp")
 async def request_otp(payload: OtpRequest, db: DB):
     result = await db.execute(select(User).where(User.email == payload.email))
     user = result.scalar_one_or_none()
@@ -30,16 +32,15 @@ async def request_otp(payload: OtpRequest, db: DB):
     )
     await db.commit()
 
-    # In production, actually send the email. During dev, log it.
     try:
         send_otp_email(payload.email, otp)
     except Exception:
-        pass  # Don't fail the request if email fails; log instead
+        pass
 
-    return {"message": "OTP sent to your email address."}
+    return ApiResponse(data={"message": "OTP sent to your email address."})
 
 
-@router.post("/verify-otp", response_model=TokenResponse)
+@router.post("/verify-otp")
 async def verify_otp(payload: OtpVerify, db: DB):
     result = await db.execute(select(User).where(User.email == payload.email))
     user = result.scalar_one_or_none()
@@ -55,10 +56,21 @@ async def verify_otp(payload: OtpVerify, db: DB):
     user.otp_expires_at = None
     await db.commit()
 
-    return TokenResponse(
-        access_token=create_access_token(str(user.id)),
-        refresh_token=create_refresh_token(str(user.id)),
+    tokens = TokenResponse(
+        accessToken=create_access_token(str(user.id)),
+        refreshToken=create_refresh_token(str(user.id)),
     )
+    user_out = UserOut(
+        id=str(user.id),
+        email=user.email,
+        createdAt=user.created_at.isoformat() if user.created_at else datetime.now(timezone.utc).isoformat(),
+    )
+
+    return ApiResponse(data={
+        "user": user_out.model_dump(by_alias=True),
+        "accessToken": tokens.access_token,
+        "refreshToken": tokens.refresh_token,
+    })
 
 
 @router.post("/refresh", response_model=TokenResponse)
@@ -78,6 +90,6 @@ async def refresh_token(payload: RefreshRequest, db: DB):
         raise HTTPException(status_code=401, detail="User not found.")
 
     return TokenResponse(
-        access_token=create_access_token(str(user.id)),
-        refresh_token=create_refresh_token(str(user.id)),
+        accessToken=create_access_token(str(user.id)),
+        refreshToken=create_refresh_token(str(user.id)),
     )

@@ -13,25 +13,25 @@ export const billsApi = {
     form.append('city', payload.city);
     form.append('state', payload.state);
 
-    return apiClient.post<ApiResponse<{ billId: string }>>('/upload-bill', form, {
+    return apiClient.post<ApiResponse<{ billId: string }>>('/api/v1/bills/upload-bill', form, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
 
   processBill: (billId: string) =>
-    apiClient.post<ApiResponse<{ taskId: string }>>(`/process-bill`, { billId }),
+    apiClient.post<ApiResponse<{ taskId: string }>>(`/api/v1/bills/process-bill`, { billId }),
 
   getBill: (billId: string) =>
-    apiClient.get<ApiResponse<Bill>>(`/bill/${billId}`),
+    apiClient.get<ApiResponse<Bill>>(`/api/v1/bills/bill/${billId}`),
 
   getBillAnalysis: (billId: string) =>
-    apiClient.get<ApiResponse<Bill>>(`/bill/${billId}/analysis`),
+    apiClient.get<ApiResponse<Bill>>(`/api/v1/bills/bill/${billId}/analysis`),
 
   getUserBills: (page = 1, limit = 10) =>
-    apiClient.get<ApiResponse<PaginatedResponse<Bill>>>('/bills', {
+    apiClient.get<ApiResponse<PaginatedResponse<Bill>>>('/api/v1/bills', {
       params: { page, limit },
     }),
 
   deleteBill: (billId: string) =>
-    apiClient.delete<ApiResponse<void>>(`/bill/${billId}`),
+    apiClient.delete<ApiResponse<void>>(`/api/v1/bills/bill/${billId}`),
 };

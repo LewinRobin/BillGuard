@@ -1,4 +1,5 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
+from datetime import datetime
 
 
 class OtpRequest(BaseModel):
@@ -11,9 +12,12 @@ class OtpVerify(BaseModel):
 
 
 class TokenResponse(BaseModel):
-    access_token: str
-    refresh_token: str
+    access_token: str = Field(alias="accessToken")
+    refresh_token: str = Field(alias="refreshToken")
     token_type: str = "bearer"
+
+    class Config:
+        populate_by_name = True
 
 
 class RefreshRequest(BaseModel):
@@ -23,7 +27,14 @@ class RefreshRequest(BaseModel):
 class UserOut(BaseModel):
     id: str
     email: str
-    created_at: str
+    created_at: str = Field(alias="createdAt")
 
     class Config:
         from_attributes = True
+        populate_by_name = True
+
+
+class ApiResponse(BaseModel):
+    data: dict
+    message: str = "OK"
+    success: bool = True
