@@ -6,7 +6,7 @@ from sqlalchemy import select, func
 
 from app.core.dependencies import CurrentUser, DB
 from app.models.bill import Bill, BillStatus
-from app.schemas.bill import BillOut, BillUploadResponse, ProcessResponse, PaginatedBills
+from app.schemas.bill import BillOut, BillUploadResponse, ProcessResponse, PaginatedBills, ApiResponse, ProcessBillRequest
 from app.services.storage import upload_file
 from app.workers.bill_tasks import process_bill_task
 
@@ -16,7 +16,7 @@ ALLOWED_TYPES = {"application/pdf", "image/jpeg", "image/png", "image/webp"}
 MAX_FILE_SIZE_MB = 20
 
 
-@router.post("/upload-bill", response_model=BillUploadResponse, status_code=201)
+@router.post("/upload-bill", status_code=201)
 async def upload_bill(
     file: UploadFile = File(...),
     city: str = Form(...),
@@ -55,17 +55,18 @@ async def upload_bill(
     db.add(bill)
     await db.commit()
 
-    return BillUploadResponse(bill_id=bill_id, message="Bill uploaded successfully.")
+    resp = BillUploadResponse(billId=bill_id, message="Bill uploaded successfully.")
+    return ApiResponse(data=resp.model_dump(by_alias=True))
 
 
-@router.post("/process-bill", response_model=ProcessResponse)
+@router.post("/process-bill")
 async def process_bill(
-    bill_id: uuid.UUID,
+    body: ProcessBillRequest,
     db: DB,
     current_user: CurrentUser,
 ):
     result = await db.execute(
-        select(Bill).where(Bill.id == bill_id, Bill.user_id == current_user.id)
+        select(Bill).where(Bill.id == body.bill_id, Bill.user_id == current_user.id)
     )
     bill = result.scalar_one_or_none()
     if not bill:
@@ -73,11 +74,12 @@ async def process_bill(
     if bill.status not in (BillStatus.pending, BillStatus.failed):
         raise HTTPException(400, f"Bill is already {bill.status}.")
 
-    task = process_bill_task.delay(str(bill_id))
-    return ProcessResponse(task_id=task.id, message="Processing started.")
+    task = process_bill_task.delay(str(body.bill_id))
+    resp = ProcessResponse(taskId=task.id, message="Processing started.")
+    return ApiResponse(data=resp.model_dump(by_alias=True))
 
 
-@router.get("", response_model=PaginatedBills)
+@router.get("")
 async def list_bills(
     db: DB,
     current_user: CurrentUser,
@@ -99,10 +101,12 @@ async def list_bills(
     )
     bills = result.scalars().all()
 
-    return PaginatedBills(items=list(bills), total=total, page=page, limit=limit)
+    items = [BillOut.model_validate(b).model_dump(by_alias=True) for b in bills]
+    data = {"items": items, "total": total, "page": page, "limit": limit}
+    return ApiResponse(data=data)
 
 
-@router.get("/bill/{bill_id}", response_model=BillOut)
+@router.get("/bill/{bill_id}")
 async def get_bill(bill_id: uuid.UUID, db: DB, current_user: CurrentUser):
     result = await db.execute(
         select(Bill).where(Bill.id == bill_id, Bill.user_id == current_user.id)
@@ -110,13 +114,18 @@ async def get_bill(bill_id: uuid.UUID, db: DB, current_user: CurrentUser):
     bill = result.scalar_one_or_none()
     if not bill:
         raise HTTPException(404, "Bill not found.")
-    return bill
+    return ApiResponse(data=BillOut.model_validate(bill).model_dump(by_alias=True))
 
 
-@router.get("/bill/{bill_id}/analysis", response_model=BillOut)
+@router.get("/bill/{bill_id}/analysis")
 async def get_bill_analysis(bill_id: uuid.UUID, db: DB, current_user: CurrentUser):
-    # Same as get_bill but semantically clearer for the frontend polling loop
-    return await get_bill(bill_id, db, current_user)
+    result = await db.execute(
+        select(Bill).where(Bill.id == bill_id, Bill.user_id == current_user.id)
+    )
+    bill = result.scalar_one_or_none()
+    if not bill:
+        raise HTTPException(404, "Bill not found.")
+    return ApiResponse(data=BillOut.model_validate(bill).model_dump(by_alias=True))
 
 
 @router.delete("/bill/{bill_id}", status_code=204)

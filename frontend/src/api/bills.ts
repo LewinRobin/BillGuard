@@ -1,21 +1,26 @@
+import { Platform } from 'react-native';
 import { apiClient } from './client';
 import type { ApiResponse, PaginatedResponse } from '../types/api.types';
 import type { Bill, UploadBillPayload } from '../types/bill.types';
 
 export const billsApi = {
-  upload: (payload: UploadBillPayload) => {
+  upload: async (payload: UploadBillPayload) => {
     const form = new FormData();
-    form.append('file', {
-      uri: payload.uri,
-      name: payload.name,
-      type: payload.mimeType,
-    } as any);
+    if (Platform.OS === 'web') {
+      const response = await fetch(payload.uri);
+      const blob = await response.blob();
+      form.append('file', new File([blob], payload.name, { type: payload.mimeType }));
+    } else {
+      form.append('file', {
+        uri: payload.uri,
+        name: payload.name,
+        type: payload.mimeType,
+      } as any);
+    }
     form.append('city', payload.city);
     form.append('state', payload.state);
 
-    return apiClient.post<ApiResponse<{ billId: string }>>('/api/v1/bills/upload-bill', form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    return apiClient.post<ApiResponse<{ billId: string }>>('/api/v1/bills/upload-bill', form);
   },
 
   processBill: (billId: string) =>
