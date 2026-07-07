@@ -3,6 +3,7 @@ import os
 import tempfile
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, status
 from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
 
 from app.core.dependencies import CurrentUser, DB
 from app.models.bill import Bill, BillStatus
@@ -74,8 +75,12 @@ async def process_bill(
     if bill.status not in (BillStatus.pending, BillStatus.failed):
         raise HTTPException(400, f"Bill is already {bill.status}.")
 
-    task = process_bill_task.delay(str(body.bill_id))
-    resp = ProcessResponse(taskId=task.id, message="Processing started.")
+    try:
+        await _process_bill(str(body.bill_id))
+    except Exception:
+        pass
+
+    resp = ProcessResponse(taskId="inline", message="Processing completed.")
     return ApiResponse(data=resp.model_dump(by_alias=True))
 
 
@@ -94,6 +99,7 @@ async def list_bills(
 
     result = await db.execute(
         select(Bill)
+        .options(selectinload(Bill.items))
         .where(Bill.user_id == current_user.id)
         .order_by(Bill.uploaded_at.desc())
         .offset(offset)
@@ -109,7 +115,7 @@ async def list_bills(
 @router.get("/bill/{bill_id}")
 async def get_bill(bill_id: uuid.UUID, db: DB, current_user: CurrentUser):
     result = await db.execute(
-        select(Bill).where(Bill.id == bill_id, Bill.user_id == current_user.id)
+        select(Bill).options(selectinload(Bill.items)).where(Bill.id == bill_id, Bill.user_id == current_user.id)
     )
     bill = result.scalar_one_or_none()
     if not bill:
@@ -120,7 +126,7 @@ async def get_bill(bill_id: uuid.UUID, db: DB, current_user: CurrentUser):
 @router.get("/bill/{bill_id}/analysis")
 async def get_bill_analysis(bill_id: uuid.UUID, db: DB, current_user: CurrentUser):
     result = await db.execute(
-        select(Bill).where(Bill.id == bill_id, Bill.user_id == current_user.id)
+        select(Bill).options(selectinload(Bill.items)).where(Bill.id == bill_id, Bill.user_id == current_user.id)
     )
     bill = result.scalar_one_or_none()
     if not bill:

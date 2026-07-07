@@ -1,7 +1,13 @@
 import React, { useState } from 'react';
 import {
-  View, Text, TouchableOpacity, SafeAreaView,
-  ScrollView, ActivityIndicator, StatusBar, TextInput,
+  View,
+  Text,
+  TouchableOpacity,
+  SafeAreaView,
+  ScrollView,
+  ActivityIndicator,
+  StatusBar,
+  TextInput,
 } from 'react-native';
 import { useBillUpload } from '../../hooks/useBillUpload';
 import { billsApi } from '../../api/bills';
@@ -37,8 +43,7 @@ export default function UploadScreen({ navigation }: UploadScreenProps) {
       <ScrollView
         contentContainerStyle={{ padding: 20, paddingBottom: 48 }}
         keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
+        showsVerticalScrollIndicator={false}>
         {/* Step 1 */}
         <StepHeader step="1" label="Select your bill" />
         <View style={{ flexDirection: 'row', gap: 12, marginBottom: 28 }}>
@@ -46,10 +51,10 @@ export default function UploadScreen({ navigation }: UploadScreenProps) {
             { type: 'pdf' as const, label: 'PDF File', sub: 'From your device', icon: '📄' },
             { type: 'image' as const, label: 'Photo', sub: 'Camera or gallery', icon: '📷' },
           ].map(({ type, label, sub, icon }) => {
-            const selected = pending?.mimeType && (
-              (type === 'pdf' && pending.mimeType === 'application/pdf') ||
-              (type === 'image' && pending.mimeType.startsWith('image/'))
-            );
+            const selected =
+              pending?.mimeType &&
+              ((type === 'pdf' && pending.mimeType === 'application/pdf') ||
+                (type === 'image' && pending.mimeType.startsWith('image/')));
             return (
               <TouchableOpacity
                 key={type}
@@ -68,15 +73,15 @@ export default function UploadScreen({ navigation }: UploadScreenProps) {
                   shadowOpacity: 0.05,
                   shadowRadius: 6,
                   elevation: selected ? 3 : 1,
-                }}
-              >
-                <Text style={{ fontSize: 32, marginBottom: 8 }}>{icon}</Text>
-                <Text style={{
-                  fontSize: 14,
-                  fontWeight: '700',
-                  color: selected ? '#1A6B4A' : '#111827',
-                  marginBottom: 2,
                 }}>
+                <Text style={{ fontSize: 32, marginBottom: 8 }}>{icon}</Text>
+                <Text
+                  style={{
+                    fontSize: 14,
+                    fontWeight: '700',
+                    color: selected ? '#1A6B4A' : '#111827',
+                    marginBottom: 2,
+                  }}>
                   {label}
                 </Text>
                 <Text style={{ fontSize: 11, color: '#9CA3AF' }}>{sub}</Text>
@@ -86,26 +91,30 @@ export default function UploadScreen({ navigation }: UploadScreenProps) {
         </View>
 
         {pending && (
-          <View style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            backgroundColor: '#ECFDF5',
-            borderRadius: 12,
-            padding: 12,
-            marginBottom: 28,
-            gap: 10,
-          }}>
-            <View style={{
-              width: 32,
-              height: 32,
-              borderRadius: 16,
-              backgroundColor: '#1A6B4A',
+          <View
+            style={{
+              flexDirection: 'row',
               alignItems: 'center',
-              justifyContent: 'center',
+              backgroundColor: '#ECFDF5',
+              borderRadius: 12,
+              padding: 12,
+              marginBottom: 28,
+              gap: 10,
             }}>
+            <View
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: 16,
+                backgroundColor: '#1A6B4A',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
               <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>✓</Text>
             </View>
-            <Text style={{ flex: 1, fontSize: 13, color: '#065F46', fontWeight: '500' }} numberOfLines={1}>
+            <Text
+              style={{ flex: 1, fontSize: 13, color: '#065F46', fontWeight: '500' }}
+              numberOfLines={1}>
               {pending.name}
             </Text>
           </View>
@@ -113,7 +122,15 @@ export default function UploadScreen({ navigation }: UploadScreenProps) {
 
         {/* Step 2 */}
         <StepHeader step="2" label="Your location" />
-        <Text style={{ fontSize: 12, fontWeight: '600', color: '#6B7280', marginBottom: 8, letterSpacing: 0.4, textTransform: 'uppercase' }}>
+        <Text
+          style={{
+            fontSize: 12,
+            fontWeight: '600',
+            color: '#6B7280',
+            marginBottom: 8,
+            letterSpacing: 0.4,
+            textTransform: 'uppercase',
+          }}>
           City
         </Text>
         <TextInput
@@ -134,14 +151,21 @@ export default function UploadScreen({ navigation }: UploadScreenProps) {
           }}
         />
 
-        <Text style={{ fontSize: 12, fontWeight: '600', color: '#6B7280', marginBottom: 10, letterSpacing: 0.4, textTransform: 'uppercase' }}>
+        <Text
+          style={{
+            fontSize: 12,
+            fontWeight: '600',
+            color: '#6B7280',
+            marginBottom: 10,
+            letterSpacing: 0.4,
+            textTransform: 'uppercase',
+          }}>
           State
         </Text>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 8, paddingBottom: 4, marginBottom: 32 }}
-        >
+          contentContainerStyle={{ gap: 8, paddingBottom: 4, marginBottom: 32 }}>
           {SUPPORTED_STATES.map((s) => (
             <TouchableOpacity
               key={s}
@@ -153,13 +177,13 @@ export default function UploadScreen({ navigation }: UploadScreenProps) {
                 backgroundColor: selectedState === s ? '#1A6B4A' : '#ffffff',
                 borderWidth: 1.5,
                 borderColor: selectedState === s ? '#1A6B4A' : '#E5E7EB',
-              }}
-            >
-              <Text style={{
-                fontSize: 13,
-                fontWeight: '500',
-                color: selectedState === s ? '#fff' : '#374151',
               }}>
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontWeight: '500',
+                  color: selectedState === s ? '#fff' : '#374151',
+                }}>
                 {s}
               </Text>
             </TouchableOpacity>
@@ -187,18 +211,25 @@ export default function UploadScreen({ navigation }: UploadScreenProps) {
             shadowRadius: 10,
             elevation: canSubmit ? 5 : 0,
           }}
-          activeOpacity={0.85}
-        >
+          activeOpacity={0.85}>
           {isUploading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={{ color: canSubmit ? '#fff' : '#9CA3AF', fontSize: 16, fontWeight: '600' }}>
+            <Text
+              style={{ color: canSubmit ? '#fff' : '#9CA3AF', fontSize: 16, fontWeight: '600' }}>
               Analyse Bill
             </Text>
           )}
         </TouchableOpacity>
 
-        <Text style={{ fontSize: 11, color: '#9CA3AF', textAlign: 'center', marginTop: 16, lineHeight: 17 }}>
+        <Text
+          style={{
+            fontSize: 11,
+            color: '#9CA3AF',
+            textAlign: 'center',
+            marginTop: 16,
+            lineHeight: 17,
+          }}>
           Your bill is encrypted at rest. Files are auto-deleted per our retention policy.
         </Text>
       </ScrollView>
@@ -209,14 +240,15 @@ export default function UploadScreen({ navigation }: UploadScreenProps) {
 function StepHeader({ step, label }: { step: string; label: string }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 10 }}>
-      <View style={{
-        width: 28,
-        height: 28,
-        borderRadius: 14,
-        backgroundColor: '#1A6B4A',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}>
+      <View
+        style={{
+          width: 28,
+          height: 28,
+          borderRadius: 14,
+          backgroundColor: '#1A6B4A',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
         <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>{step}</Text>
       </View>
       <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>{label}</Text>
