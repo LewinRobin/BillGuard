@@ -9,7 +9,7 @@ from app.core.dependencies import CurrentUser, DB
 from app.models.bill import Bill, BillStatus
 from app.schemas.bill import BillOut, BillUploadResponse, ProcessResponse, PaginatedBills, ApiResponse, ProcessBillRequest
 from app.services.storage import upload_file
-from app.workers.bill_tasks import process_bill_task
+from app.workers.bill_tasks import _process_bill
 
 router = APIRouter(prefix="/bills", tags=["bills"])
 
@@ -19,11 +19,11 @@ MAX_FILE_SIZE_MB = 20
 
 @router.post("/upload-bill", status_code=201)
 async def upload_bill(
+    db: DB,
+    current_user: CurrentUser,
     file: UploadFile = File(...),
     city: str = Form(...),
     state: str = Form(...),
-    db: DB = ...,
-    current_user: CurrentUser = ...,
 ):
     if file.content_type not in ALLOWED_TYPES:
         raise HTTPException(
@@ -33,10 +33,13 @@ async def upload_bill(
     if len(contents) > MAX_FILE_SIZE_MB * 1024 * 1024:
         raise HTTPException(400, f"File exceeds {MAX_FILE_SIZE_MB}MB limit.")
 
+    # uuid4() creates a random UUID, which is suitable for generating unique identifiers for bills.
     bill_id = uuid.uuid4()
+    # The S3 key is constructed using the user's ID and the bill's UUID to ensure that each bill is stored in a unique location in the S3 bucket. This structure helps
+    # organize bills by user and bill ID, making it easier to manage and retrieve them later.
     s3_key = f"bills/{current_user.id}/{bill_id}/{file.filename}"
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1]) as tmp:
+    with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename or "")[1]) as tmp:
         tmp.write(contents)
         tmp_path = tmp.name
 
