@@ -1,14 +1,16 @@
 import pytest
 import asyncio
 from httpx import AsyncClient, ASGITransport
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy.pool import NullPool
 from app.main import app
 from app.db.base import Base
 from app.db.session import get_db
 
 TEST_DB_URL = "postgresql+asyncpg://postgres:password@localhost:5432/billcheck_test"
 
-test_engine = create_async_engine(TEST_DB_URL)
+test_engine = create_async_engine(TEST_DB_URL, poolclass=NullPool)
 TestSession = async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
 
 
@@ -20,6 +22,7 @@ def event_loop():
 @pytest.fixture(autouse=True)
 async def setup_db():
     async with test_engine.begin() as conn:
+        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await conn.run_sync(Base.metadata.create_all)
     yield
     async with test_engine.begin() as conn:

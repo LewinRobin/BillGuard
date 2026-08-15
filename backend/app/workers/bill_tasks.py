@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import uuid
 from app.workers.celery_app import celery_app
 from app.db.session import AsyncSessionLocal
@@ -7,6 +8,8 @@ from app.services import ocr_service, normalization, anomaly, storage
 from sqlalchemy import select
 import boto3
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 def run_async(coro):
@@ -33,6 +36,7 @@ async def _process_bill(bill_id: str):
 
         try:
             # 1. Download file from S3
+            logger.info("Processing bill %s: downloading s3://%s/%s", bill.id, settings.S3_BUCKET_NAME, bill.s3_key)
             s3 = boto3.client(
                 "s3",
                 aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
@@ -42,19 +46,44 @@ async def _process_bill(bill_id: str):
             obj = s3.get_object(
                 Bucket=settings.S3_BUCKET_NAME, Key=bill.s3_key)
             file_bytes = obj["Body"].read()
+            logger.info("Downloaded %d bytes for bill %s", len(file_bytes), bill.id)
 
             # 2. OCR
+            logger.info("Running OCR for bill %s", bill.id)
             extracted = ocr_service.extract_bill_from_image(file_bytes)
             bill.hospital_name = extracted.hospital_name or bill.hospital_name
             bill.total_amount = extracted.grand_total
+            logger.info(
+                "OCR result for bill %s: hospital=%r total=%s items=%d",
+                bill.id,
+                bill.hospital_name,
+                bill.total_amount,
+                len(extracted.items),
+            )
 
             # 3. For each item: normalize + benchmark + anomaly
             bill_items = []
             total_flagged = 0.0
 
             for raw_item in extracted.items:
+                logger.info(
+                    "Bill %s item: text=%r qty=%s unit=%s total=%s",
+                    bill.id,
+                    raw_item.raw_text,
+                    raw_item.quantity,
+                    raw_item.unit_price,
+                    raw_item.total_price,
+                )
                 service_id, canonical_name, category = await normalization.find_best_match(
                     db, raw_item.raw_text
+                )
+                logger.info(
+                    "Bill %s normalization: text=%r -> service_id=%s canonical=%r category=%r",
+                    bill.id,
+                    raw_item.raw_text,
+                    service_id,
+                    canonical_name,
+                    category,
                 )
 
                 benchmark = None
@@ -62,9 +91,27 @@ async def _process_bill(bill_id: str):
                     benchmark = await anomaly.get_benchmark(
                         db, service_id, bill.city, bill.state
                     )
+                if benchmark is None:
+                    logger.warning(
+                        "Bill %s: NO benchmark found for item %r (service_id=%s, city=%s, state=%s)",
+                        bill.id,
+                        raw_item.raw_text,
+                        service_id,
+                        bill.city,
+                        bill.state,
+                    )
 
                 is_flagged, score, pct_above = anomaly.compute_anomaly(
                     raw_item.total_price, benchmark
+                )
+                logger.info(
+                    "Bill %s anomaly: item=%r flagged=%s score=%s pct_above_avg=%s benchmark_avg=%s",
+                    bill.id,
+                    raw_item.raw_text,
+                    is_flagged,
+                    score,
+                    pct_above,
+                    benchmark.avg_price if benchmark else None,
                 )
 
                 if is_flagged:
@@ -99,10 +146,18 @@ async def _process_bill(bill_id: str):
             bill.total_flagged_amount = total_flagged
             bill.risk_level = RiskLevel(risk)
             bill.status = BillStatus.completed
+            logger.info(
+                "Bill %s completed: items=%d flagged_amount=%s risk=%s",
+                bill.id,
+                len(bill_items),
+                total_flagged,
+                risk,
+            )
 
             await db.commit()
 
         except Exception as e:
+            logger.exception("Bill %s processing FAILED: %s", bill.id, e)
             bill.status = BillStatus.failed
             await db.commit()
             raise

@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
+from app.core.logger import logger
 
 from app.core.dependencies import DB
 from app.core.security import (
@@ -35,7 +36,7 @@ async def request_otp(payload: OtpRequest, db: DB):
     try:
         send_otp_email(payload.email, otp)
     except Exception:
-        pass
+        logger.exception(f"Failed to send OTP email to {payload.email}")
 
     return ApiResponse(data={"message": "OTP sent to your email address."})
 

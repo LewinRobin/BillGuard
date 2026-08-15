@@ -2,6 +2,9 @@ import re
 from dataclasses import dataclass
 from typing import Optional
 from google.cloud import vision
+from logging import getLogger
+logger = getLogger(__name__)
+
 
 
 @dataclass
@@ -20,20 +23,39 @@ class ExtractedBill:
 
 
 def extract_bill_from_image(image_bytes: bytes) -> ExtractedBill:
+    logger.info("Calling Google Vision OCR on %d bytes", len(image_bytes))
     client = vision.ImageAnnotatorClient()
     image = vision.Image(content=image_bytes)
-    response = client.document_text_detection(image=image)
+    # This following line is commented out because the `document_text_detection` method is added at runtime or mapped dynamically, and may not be directly available in
+    # the client library. Instead, we use `annotate_image` with the appropriate feature type.
+    # response = client.document_text_detection(image=image)
+    response = client.annotate_image({
+        "image": image,
+        "features": [{"type_": vision.Feature.Type.DOCUMENT_TEXT_DETECTION}],
+    })
 
     full_text = response.full_text_annotation.text
-    return _parse_bill_text(full_text)
+    logger.info("OCR raw text (%d chars):\n%s", len(full_text), full_text)
+
+    bill = _parse_bill_text(full_text)
+    logger.info(
+        "OCR parsed: hospital=%r items=%d grand_total=%s",
+        bill.hospital_name,
+        len(bill.items),
+        bill.grand_total,
+    )
+    return bill
 
 
 def _parse_bill_text(text: str) -> ExtractedBill:
     lines = [l.strip() for l in text.splitlines() if l.strip()]
+    logger.debug(f"Extracted lines from OCR: {lines}")
 
     hospital_name = _extract_hospital_name(lines)
     items = _extract_line_items(lines)
     grand_total = _extract_grand_total(lines)
+
+    logger.info("Parsed %d line items: %s", len(items), items)
 
     return ExtractedBill(
         hospital_name=hospital_name,
@@ -51,19 +73,93 @@ def _extract_hospital_name(lines: list[str]) -> str:
 
 
 def _extract_line_items(lines: list[str]) -> list[ExtractedItem]:
+    # Prefer the columnar "DETAILED BREAKUP" table used by most Indian hospital
+    # bills; fall back to single-line items for other layouts.
+    breakup_start = next(
+        (i for i, l in enumerate(lines) if "detailed breakup" in l.lower()),
+        None,
+    )
+    if breakup_start is not None:
+        items = _parse_breakup_items(lines[breakup_start + 1:])
+        if items:
+            return items
+    return _parse_inline_items(lines)
+
+
+def _parse_breakup_items(lines: list[str]) -> list[ExtractedItem]:
+    money_re = re.compile(r"^\d{1,7}(?:,\d{3})*\.\d{2}$")
+    code_re = re.compile(r"^\d{5,7}$")
+    date_re = re.compile(r"^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}")
+    time_re = re.compile(r"^\d{1,2}:\d{2}")
+    units_re = re.compile(r"^\d{1,4}(?:/\d{1,4})?$")
+    paren_re = re.compile(r"^\(.*\)$")
+    header_words = ("particulars", "date & time", "rate", "units", "amount", "code")
+
     items: list[ExtractedItem] = []
-    # Pattern: description followed by optional qty, unit price, total
-    price_pattern = re.compile(r"[\d,]+\.?\d*")
+    desc_parts: list[str] = []
+    amounts: list[float] = []
+    skip_amounts = False  # True right after a Subtotal line (skip its value)
+
+    def flush():
+        nonlocal desc_parts, amounts
+        if desc_parts and amounts:
+            total = amounts[-1]
+            unit = amounts[0] if len(amounts) >= 2 else total
+            items.append(ExtractedItem(
+                raw_text=" ".join(desc_parts).strip(),
+                quantity=1,
+                unit_price=unit,
+                total_price=total,
+            ))
+        desc_parts = []
+        amounts = []
+
+    for idx, line in enumerate(lines):
+        s = line.strip()
+        if not s:
+            continue
+        low = s.lower()
+        if low.startswith("subtotal"):
+            flush()
+            skip_amounts = True
+            continue
+        if any(h in low for h in header_words):
+            continue
+        if paren_re.match(s) or code_re.match(s) or date_re.match(s) or time_re.match(s):
+            continue
+        if money_re.match(s):
+            if not skip_amounts:
+                amounts.append(float(s.replace(",", "")))
+            continue
+        if units_re.match(s):
+            continue
+        # Description line: starts a new item only if the previous one has prices
+        if desc_parts and amounts:
+            flush()
+        # Skip category headers like "Nursing Charges" that are followed by a code line
+        next_line = lines[idx + 1].strip() if idx + 1 < len(lines) else ""
+        if code_re.match(next_line):
+            skip_amounts = True
+            continue
+        skip_amounts = False
+        desc_parts.append(s)
+
+    flush()
+    return items
+
+
+def _parse_inline_items(lines: list[str]) -> list[ExtractedItem]:
+    items: list[ExtractedItem] = []
+    # Pattern: description followed by optional qty, unit price, total on one line
+    price_pattern = re.compile(r"\d+\.\d{2}")
 
     for line in lines:
         prices = price_pattern.findall(line)
-        if len(prices) >= 2:
+        if prices:
             try:
                 prices_float = [float(p.replace(",", "")) for p in prices]
                 total = prices_float[-1]
                 unit = prices_float[-2] if len(prices_float) >= 2 else total
-                qty_str = prices_float[-3] if len(prices_float) >= 3 else 1
-                qty = int(qty_str) if qty_str <= 100 else 1
 
                 # Description: everything before the first price
                 first_price_pos = line.find(prices[0])
@@ -71,7 +167,7 @@ def _extract_line_items(lines: list[str]) -> list[ExtractedItem]:
                 if description and total > 0:
                     items.append(ExtractedItem(
                         raw_text=description,
-                        quantity=qty,
+                        quantity=1,
                         unit_price=unit,
                         total_price=total,
                     ))
@@ -82,8 +178,15 @@ def _extract_line_items(lines: list[str]) -> list[ExtractedItem]:
 
 
 def _extract_grand_total(lines: list[str]) -> float:
-    total_keywords = ["grand total", "total amount",
-                      "net amount", "total payable"]
+    total_keywords = [
+        "grand total",
+        "total amount",
+        "bill amount",
+        "total bill",
+        "net amount",
+        "amount payable",
+        "total payable",
+    ]
     price_pattern = re.compile(r"[\d,]+\.?\d*")
 
     for line in lines:

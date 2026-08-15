@@ -36,10 +36,10 @@ async def find_best_match(
     result = await db.execute(
         text("""
             SELECT id, canonical_name, category,
-                   1 - (embedding <=> :embedding::vector) AS similarity
+                   1 - (embedding <=> CAST(:embedding AS vector)) AS similarity
             FROM services
             WHERE embedding IS NOT NULL
-            ORDER BY embedding <=> :embedding::vector
+            ORDER BY embedding <=> CAST(:embedding AS vector)
             LIMIT 1
         """),
         {"embedding": embedding_str},

@@ -3,8 +3,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from app.api.v1.router import api_router
+from app.core.logger import configure_logging, logger
 from app.db.session import engine
 from app.db.base import Base
+
+configure_logging()
+logger.info("BillCheck API starting")
 
 
 @asynccontextmanager
