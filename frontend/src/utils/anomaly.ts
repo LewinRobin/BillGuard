@@ -12,7 +12,9 @@ export function getAnomalyLabel(percentAbove: number | null): string {
   return `${Math.round(percentAbove)}% above regional average`;
 }
 
-export function getBillRiskLevel(items: { anomalyScore: number; anomalyFlag: boolean }[]): AnomalyLevel {
+export function getBillRiskLevel(
+  items: { anomalyScore: number; anomalyFlag: boolean }[]
+): AnomalyLevel {
   const flagged = items.filter((i) => i.anomalyFlag);
   if (flagged.length === 0) return 'none';
   const maxScore = Math.max(...flagged.map((i) => i.anomalyScore));

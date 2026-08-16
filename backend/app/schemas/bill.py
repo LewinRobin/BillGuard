@@ -72,6 +72,24 @@ class ProcessBillRequest(BaseModel):
         populate_by_name = True
 
 
+class CorrectItemRequest(BaseModel):
+    service_id: Optional[UUID] = Field(alias="serviceId", default=None)
+    custom_name: Optional[str] = Field(alias="customName", default=None)
+
+    class Config:
+        populate_by_name = True
+
+
+class ServiceOut(BaseModel):
+    id: UUID
+    canonical_name: str = Field(alias="canonicalName")
+    category: str
+
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+
+
 class ApiResponse(BaseModel):
     data: dict
     message: str = "OK"

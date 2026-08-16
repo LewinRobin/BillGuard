@@ -1,8 +1,24 @@
 import { useState } from 'react';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { billsApi } from '../api/bills';
 import type { UploadBillPayload } from '../types/bill.types';
+
+const ENHANCE_TARGET_WIDTH = 2000;
+
+async function enhanceImage(uri: string): Promise<string> {
+  try {
+    const result = await ImageManipulator.manipulateAsync(
+      uri,
+      [{ resize: { width: ENHANCE_TARGET_WIDTH } }],
+      { compress: 0.92, format: ImageManipulator.SaveFormat.JPEG }
+    );
+    return result.uri;
+  } catch {
+    return uri;
+  }
+}
 
 export function useBillUpload() {
   const [isUploading, setIsUploading] = useState(false);
@@ -35,8 +51,9 @@ export function useBillUpload() {
     if (result.canceled) return null;
 
     const asset = result.assets[0];
+    const enhancedUri = await enhanceImage(asset.uri);
     return {
-      uri: asset.uri,
+      uri: enhancedUri,
       name: `bill_${Date.now()}.jpg`,
       mimeType: 'image/jpeg',
       city: '',

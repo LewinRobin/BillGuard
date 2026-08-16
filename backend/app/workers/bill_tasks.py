@@ -5,6 +5,7 @@ from app.workers.celery_app import celery_app
 from app.db.session import AsyncSessionLocal
 from app.models.bill import Bill, BillItem, BillStatus, RiskLevel
 from app.services import ocr_service, normalization, anomaly, storage
+from app.services.llm_extractor import extract_bill_with_llm
 from sqlalchemy import select
 import boto3
 from app.core.config import settings
@@ -50,7 +51,14 @@ async def _process_bill(bill_id: str):
 
             # 2. OCR
             logger.info("Running OCR for bill %s", bill.id)
-            extracted = ocr_service.extract_bill_from_image(file_bytes)
+            ocr_text = ocr_service.ocr_text_from_image(file_bytes)
+            extracted = ocr_service.parse_bill_text(ocr_text)
+
+            # 2b. Try LLM structuring of the raw OCR text, fall back to regex
+            llm_extracted = extract_bill_with_llm(ocr_text)
+            if llm_extracted is not None:
+                extracted = llm_extracted
+
             bill.hospital_name = extracted.hospital_name or bill.hospital_name
             bill.total_amount = extracted.grand_total
             logger.info(

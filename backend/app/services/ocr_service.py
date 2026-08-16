@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Optional
 from google.cloud import vision
 from logging import getLogger
+from app.services.image_enhance import enhance_image
 logger = getLogger(__name__)
 
 
@@ -22,8 +23,9 @@ class ExtractedBill:
     grand_total: float
 
 
-def extract_bill_from_image(image_bytes: bytes) -> ExtractedBill:
+def ocr_text_from_image(image_bytes: bytes) -> str:
     logger.info("Calling Google Vision OCR on %d bytes", len(image_bytes))
+    image_bytes = enhance_image(image_bytes)
     client = vision.ImageAnnotatorClient()
     image = vision.Image(content=image_bytes)
     # This following line is commented out because the `document_text_detection` method is added at runtime or mapped dynamically, and may not be directly available in
@@ -36,8 +38,13 @@ def extract_bill_from_image(image_bytes: bytes) -> ExtractedBill:
 
     full_text = response.full_text_annotation.text
     logger.info("OCR raw text (%d chars):\n%s", len(full_text), full_text)
+    return full_text
 
-    bill = _parse_bill_text(full_text)
+
+def extract_bill_from_image(image_bytes: bytes) -> ExtractedBill:
+    full_text = ocr_text_from_image(image_bytes)
+
+    bill = parse_bill_text(full_text)
     logger.info(
         "OCR parsed: hospital=%r items=%d grand_total=%s",
         bill.hospital_name,
@@ -47,7 +54,7 @@ def extract_bill_from_image(image_bytes: bytes) -> ExtractedBill:
     return bill
 
 
-def _parse_bill_text(text: str) -> ExtractedBill:
+def parse_bill_text(text: str) -> ExtractedBill:
     lines = [l.strip() for l in text.splitlines() if l.strip()]
     logger.debug(f"Extracted lines from OCR: {lines}")
 

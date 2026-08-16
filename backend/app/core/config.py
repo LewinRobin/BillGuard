@@ -32,6 +32,9 @@ class Settings(BaseSettings):
 
     GOOGLE_APPLICATION_CREDENTIALS: str = ""
 
+    GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-3.5-flash"
+
 
 @lru_cache
 def get_settings() -> Settings:

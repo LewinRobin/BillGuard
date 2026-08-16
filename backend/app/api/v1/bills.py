@@ -6,9 +6,12 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
 from app.core.dependencies import CurrentUser, DB
-from app.models.bill import Bill, BillStatus
-from app.schemas.bill import BillOut, BillUploadResponse, ProcessResponse, PaginatedBills, ApiResponse, ProcessBillRequest
+from app.core.logger import logger
+from app.models.bill import Bill, BillStatus, RiskLevel
+from app.models.service import Service
+from app.schemas.bill import BillOut, BillUploadResponse, ProcessResponse, PaginatedBills, ApiResponse, ProcessBillRequest, CorrectItemRequest
 from app.services.storage import upload_file
+from app.services import anomaly
 from app.workers.bill_tasks import _process_bill
 
 router = APIRouter(prefix="/bills", tags=["bills"])
@@ -140,11 +143,13 @@ async def get_bill_analysis(bill_id: uuid.UUID, db: DB, current_user: CurrentUse
 @router.delete("/bill/{bill_id}", status_code=204)
 async def delete_bill(bill_id: uuid.UUID, db: DB, current_user: CurrentUser):
     from app.services.storage import delete_file
+    logger.info("DELETE bill=%s user=%s", bill_id, current_user.id)
     result = await db.execute(
         select(Bill).where(Bill.id == bill_id, Bill.user_id == current_user.id)
     )
     bill = result.scalar_one_or_none()
     if not bill:
+        logger.warning("DELETE bill=%s not found for user=%s", bill_id, current_user.id)
         raise HTTPException(404, "Bill not found.")
 
     if bill.s3_key:
@@ -152,3 +157,88 @@ async def delete_bill(bill_id: uuid.UUID, db: DB, current_user: CurrentUser):
 
     await db.delete(bill)
     await db.commit()
+    logger.info("Deleted bill=%s user=%s", bill_id, current_user.id)
+
+
+@router.patch("/bill/{bill_id}/items/{item_id}")
+async def correct_item(
+    bill_id: uuid.UUID,
+    item_id: uuid.UUID,
+    body: CorrectItemRequest,
+    db: DB,
+    current_user: CurrentUser,
+):
+    result = await db.execute(
+        select(Bill).options(selectinload(Bill.items)).where(
+            Bill.id == bill_id, Bill.user_id == current_user.id
+        )
+    )
+    bill = result.scalar_one_or_none()
+    if not bill:
+        raise HTTPException(404, "Bill not found.")
+
+    item = next((i for i in bill.items if i.id == item_id), None)
+    if not item:
+        raise HTTPException(404, "Bill item not found.")
+
+    if body.service_id and body.custom_name:
+        raise HTTPException(400, "Provide either serviceId or customName, not both.")
+    if not body.service_id and not body.custom_name:
+        raise HTTPException(400, "Provide serviceId or customName.")
+
+    service = None
+    if body.service_id:
+        service_result = await db.execute(
+            select(Service).where(Service.id == body.service_id)
+        )
+        service = service_result.scalar_one_or_none()
+        if not service:
+            raise HTTPException(404, "Service not found.")
+    else:
+        name = body.custom_name.strip()
+        if not name:
+            raise HTTPException(400, "Custom service name cannot be empty.")
+        existing = await db.execute(
+            select(Service).where(Service.canonical_name == name)
+        )
+        service = existing.scalar_one_or_none()
+        if service is None:
+            from app.services.normalization import embed_text
+            service = Service(
+                id=uuid.uuid4(),
+                canonical_name=name,
+                category="other",
+                embedding=embed_text(name),
+            )
+            db.add(service)
+            await db.flush()
+
+    item.normalized_service_id = service.id
+    item.normalized_service_name = service.canonical_name
+    item.category = service.category
+
+    benchmark = await anomaly.get_benchmark(db, str(service.id), bill.city, bill.state)
+    is_flagged, score, pct_above = anomaly.compute_anomaly(item.total_price, benchmark)
+    item.avg_regional_price = benchmark.avg_price if benchmark else None
+    item.min_regional_price = benchmark.min_price if benchmark else None
+    item.max_regional_price = benchmark.max_price if benchmark else None
+    item.anomaly_flag = is_flagged
+    item.anomaly_score = score
+    item.percent_above_average = pct_above
+
+    total_flagged = 0.0
+    risk_items = []
+    for it in bill.items:
+        risk_items.append({"anomaly_flag": it.anomaly_flag, "anomaly_score": it.anomaly_score})
+        if it.anomaly_flag:
+            total_flagged += it.total_price
+    bill.total_flagged_amount = total_flagged
+    bill.risk_level = RiskLevel(anomaly.compute_bill_risk_level(risk_items))
+
+    await db.commit()
+
+    refreshed = await db.execute(
+        select(Bill).options(selectinload(Bill.items)).where(Bill.id == bill.id)
+    )
+    bill = refreshed.scalar_one()
+    return ApiResponse(data=BillOut.model_validate(bill).model_dump(by_alias=True))

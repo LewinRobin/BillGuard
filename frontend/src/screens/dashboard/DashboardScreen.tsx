@@ -13,6 +13,8 @@ import { billsApi } from '../../api/bills';
 import { useBillStore } from '../../store/useBillStore';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import ErrorView from '../../components/common/ErrorView';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
+import { showAlert } from '../../utils/alert';
 import type { DashboardScreenProps } from '../../navigation/types';
 import { formatINR } from '../../utils/currency';
 import type { Bill, AnomalyLevel } from '../../types/bill.types';
@@ -36,7 +38,15 @@ const RISK_LABELS: Record<AnomalyLevel, string> = {
   high: 'High risk',
 };
 
-function BillCard({ bill, onPress }: { bill: Bill; onPress: () => void }) {
+function BillCard({
+  bill,
+  onPress,
+  onDelete,
+}: {
+  bill: Bill;
+  onPress: () => void;
+  onDelete: () => void;
+}) {
   const flagged = bill.items.filter((i) => i.anomalyFlag).length;
   const color = RISK_COLORS[bill.riskLevel];
   const bg = RISK_BG[bill.riskLevel];
@@ -66,16 +76,34 @@ function BillCard({ bill, onPress }: { bill: Bill; onPress: () => void }) {
             {bill.city}, {bill.state}
           </Text>
         </View>
-        <View
-          style={{
-            paddingHorizontal: 10,
-            paddingVertical: 4,
-            borderRadius: 20,
-            backgroundColor: bg,
-          }}>
-          <Text style={{ fontSize: 11, fontWeight: '600', color }}>
-            {RISK_LABELS[bill.riskLevel]}
-          </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <View
+            style={{
+              paddingHorizontal: 10,
+              paddingVertical: 4,
+              borderRadius: 20,
+              backgroundColor: bg,
+            }}>
+            <Text style={{ fontSize: 11, fontWeight: '600', color }}>
+              {RISK_LABELS[bill.riskLevel]}
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: 14,
+              backgroundColor: '#FEF2F2',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+            <Text style={{ fontSize: 14 }}>🗑</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -115,24 +143,47 @@ function BillCard({ bill, onPress }: { bill: Bill; onPress: () => void }) {
 }
 
 export default function DashboardScreen({ navigation }: DashboardScreenProps) {
-  const { bills, setBills } = useBillStore();
+  const { bills, setBills, removeBill } = useBillStore();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Bill | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
-  const fetchBills = useCallback(async (isRefresh = false) => {
+  const handleDelete = useCallback((bill: Bill) => {
+    setDeleteTarget(bill);
+  }, []);
+
+  const confirmDelete = useCallback(async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      if (isRefresh) setRefreshing(true);
-      const res = await billsApi.getUserBills();
-      setBills(res.data.data.items);
-      setError(null);
+      await billsApi.deleteBill(deleteTarget.id);
+      removeBill(deleteTarget.id);
+      setDeleteTarget(null);
     } catch {
-      setError('Could not load your bills. Check your connection and try again.');
+      showAlert('Error', 'Could not delete the bill. Please try again.');
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      setDeleting(false);
     }
-  }, [setBills]);
+  }, [deleteTarget, removeBill]);
+
+  const fetchBills = useCallback(
+    async (isRefresh = false) => {
+      try {
+        if (isRefresh) setRefreshing(true);
+        const res = await billsApi.getUserBills();
+        setBills(res.data.data.items);
+        setError(null);
+      } catch {
+        setError('Could not load your bills. Check your connection and try again.');
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [setBills]
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -157,6 +208,7 @@ export default function DashboardScreen({ navigation }: DashboardScreenProps) {
           <BillCard
             bill={item}
             onPress={() => navigation.navigate('Analysis', { billId: item.id })}
+            onDelete={() => handleDelete(item)}
           />
         )}
         refreshControl={
@@ -333,6 +385,20 @@ export default function DashboardScreen({ navigation }: DashboardScreenProps) {
           <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>+ Upload Bill</Text>
         </TouchableOpacity>
       </View>
+      <ConfirmDialog
+        visible={deleteTarget !== null}
+        title="Delete Bill"
+        message={
+          deleteTarget
+            ? `Remove "${deleteTarget.hospitalName}"? This bill and its analysis will be permanently deleted.`
+            : ''
+        }
+        loading={deleting}
+        onConfirm={confirmDelete}
+        onCancel={() => {
+          if (!deleting) setDeleteTarget(null);
+        }}
+      />
     </SafeAreaView>
   );
 }

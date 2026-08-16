@@ -6,7 +6,10 @@ export const authApi = {
     apiClient.post<ApiResponse<{ message: string }>>('/api/v1/auth/request-otp', { email }),
 
   verifyOtp: (email: string, otp: string) =>
-    apiClient.post<ApiResponse<AuthTokens & { user: User }>>('/api/v1/auth/verify-otp', { email, otp }),
+    apiClient.post<ApiResponse<AuthTokens & { user: User }>>('/api/v1/auth/verify-otp', {
+      email,
+      otp,
+    }),
 
   refreshToken: (refreshToken: string) =>
     apiClient.post<ApiResponse<AuthTokens>>('/api/v1/auth/refresh', { refreshToken }),

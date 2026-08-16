@@ -1,8 +1,5 @@
-import React, { useState, useRef } from 'react';
-import {
-  View, Text, TextInput, TouchableOpacity,
-  KeyboardAvoidingView, Platform,
-} from 'react-native';
+import React, { useState } from 'react';
+import { Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import { authApi } from '../../api/auth';
 import { useAuthStore } from '../../store/useAuthStore';
 import type { VerifyOtpScreenProps } from '../../navigation/types';
@@ -37,22 +34,24 @@ export default function VerifyOtpScreen({ route }: VerifyOtpScreenProps) {
     <KeyboardAvoidingView
       className="flex-1 justify-center px-6"
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={{ backgroundColor: COLORS.background }}
-    >
-      <Text className="text-2xl font-bold mb-2" style={{ color: COLORS.textPrimary }}>
+      style={{ backgroundColor: COLORS.background }}>
+      <Text className="mb-2 text-2xl font-bold" style={{ color: COLORS.textPrimary }}>
         Check your email
       </Text>
-      <Text className="text-sm mb-8" style={{ color: COLORS.textSecondary }}>
+      <Text className="mb-8 text-sm" style={{ color: COLORS.textSecondary }}>
         We sent a 6-digit code to {email}
       </Text>
 
       <TextInput
         value={otp}
-        onChangeText={(t) => { setOtp(t.replace(/\D/g, '').slice(0, 6)); setError(''); }}
+        onChangeText={(t) => {
+          setOtp(t.replace(/\D/g, '').slice(0, 6));
+          setError('');
+        }}
         placeholder="000000"
         keyboardType="number-pad"
         maxLength={6}
-        className="rounded-xl px-4 py-4 text-2xl text-center tracking-widest mb-4"
+        className="mb-4 rounded-xl px-4 py-4 text-center text-2xl tracking-widest"
         style={{
           backgroundColor: COLORS.surface,
           borderWidth: 1,
@@ -64,16 +63,17 @@ export default function VerifyOtpScreen({ route }: VerifyOtpScreenProps) {
       />
 
       {error ? (
-        <Text className="text-sm mb-4" style={{ color: COLORS.danger }}>{error}</Text>
+        <Text className="mb-4 text-sm" style={{ color: COLORS.danger }}>
+          {error}
+        </Text>
       ) : null}
 
       <TouchableOpacity
         onPress={handleVerify}
         disabled={loading || otp.length !== 6}
-        className="rounded-xl py-4 items-center"
-        style={{ backgroundColor: (loading || otp.length !== 6) ? '#A8D5BF' : COLORS.primary }}
-      >
-        <Text className="text-white font-semibold text-base">
+        className="items-center rounded-xl py-4"
+        style={{ backgroundColor: loading || otp.length !== 6 ? '#A8D5BF' : COLORS.primary }}>
+        <Text className="text-base font-semibold text-white">
           {loading ? 'Verifying...' : 'Verify OTP'}
         </Text>
       </TouchableOpacity>

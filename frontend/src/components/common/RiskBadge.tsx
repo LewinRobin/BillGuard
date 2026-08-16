@@ -17,16 +17,11 @@ const LABELS: Record<AnomalyLevel, string> = {
 export default function RiskBadge({ level }: Props) {
   return (
     <View
-      className= "rounded-full px-3 py-1 self-start"
-  style = {{ backgroundColor: RISK_BG_COLORS[level] }
-}
-    >
-  <Text
-        className="text-xs font-semibold"
-style = {{ color: RISK_COLORS[level] }}
-      >
-  { LABELS[level]}
-  </Text>
-  </View>
+      className="self-start rounded-full px-3 py-1"
+      style={{ backgroundColor: RISK_BG_COLORS[level] }}>
+      <Text className="text-xs font-semibold" style={{ color: RISK_COLORS[level] }}>
+        {LABELS[level]}
+      </Text>
+    </View>
   );
 }

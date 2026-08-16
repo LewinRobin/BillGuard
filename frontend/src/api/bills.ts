@@ -26,8 +26,7 @@ export const billsApi = {
   processBill: (billId: string) =>
     apiClient.post<ApiResponse<{ taskId: string }>>(`/api/v1/bills/process-bill`, { billId }),
 
-  getBill: (billId: string) =>
-    apiClient.get<ApiResponse<Bill>>(`/api/v1/bills/bill/${billId}`),
+  getBill: (billId: string) => apiClient.get<ApiResponse<Bill>>(`/api/v1/bills/bill/${billId}`),
 
   getBillAnalysis: (billId: string) =>
     apiClient.get<ApiResponse<Bill>>(`/api/v1/bills/bill/${billId}/analysis`),
@@ -39,4 +38,10 @@ export const billsApi = {
 
   deleteBill: (billId: string) =>
     apiClient.delete<ApiResponse<void>>(`/api/v1/bills/bill/${billId}`),
+
+  correctItem: (
+    billId: string,
+    itemId: string,
+    payload: { serviceId?: string; customName?: string }
+  ) => apiClient.patch<ApiResponse<Bill>>(`/api/v1/bills/bill/${billId}/items/${itemId}`, payload),
 };

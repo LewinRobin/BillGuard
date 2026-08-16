@@ -17,11 +17,14 @@ export default function AppNavigator() {
         headerTintColor: COLORS.primary,
         headerTitleStyle: { fontWeight: '600', color: COLORS.textPrimary },
         headerShadowVisible: false,
-      }}
-    >
+      }}>
       <Stack.Screen name="Dashboard" component={DashboardScreen} options={{ title: 'My Bills' }} />
       <Stack.Screen name="Upload" component={UploadScreen} options={{ title: 'Upload Bill' }} />
-      <Stack.Screen name="Analysis" component={AnalysisScreen} options={{ title: 'Bill Analysis' }} />
+      <Stack.Screen
+        name="Analysis"
+        component={AnalysisScreen}
+        options={{ title: 'Bill Analysis' }}
+      />
       <Stack.Screen name="Report" component={ReportScreen} options={{ title: 'Export Report' }} />
     </Stack.Navigator>
   );

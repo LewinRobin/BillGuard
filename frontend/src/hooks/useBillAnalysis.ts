@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { billsApi } from '../api/bills';
 import type { Bill } from '../types/bill.types';
 
@@ -17,7 +17,7 @@ export function useBillAnalysis(billId: string | null) {
     setIsPolling(false);
   };
 
-  const fetchBill = async () => {
+  const fetchBill = useCallback(async () => {
     if (!billId) return;
     try {
       const res = await billsApi.getBillAnalysis(billId);
@@ -37,7 +37,7 @@ export function useBillAnalysis(billId: string | null) {
       setError(e?.response?.data?.message ?? 'Failed to fetch analysis.');
       stopPolling();
     }
-  };
+  }, [billId]);
 
   useEffect(() => {
     if (!billId) return;
@@ -45,7 +45,7 @@ export function useBillAnalysis(billId: string | null) {
     setIsPolling(true);
     fetchBill();
     return stopPolling;
-  }, [billId]);
+  }, [fetchBill, billId]);
 
-  return { bill, isPolling, error };
+  return { bill, isPolling, error, refresh: fetchBill };
 }

@@ -12,10 +12,12 @@ celery
 redis
 boto3
 google-cloud-vision
+google-genai
 sentence-transformers
 pgvector
 numpy
 scipy
+opencv-python-headless
 httpx
 python-dotenv
 pytest
