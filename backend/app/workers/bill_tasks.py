@@ -49,9 +49,29 @@ async def _process_bill(bill_id: str):
             file_bytes = obj["Body"].read()
             logger.info("Downloaded %d bytes for bill %s", len(file_bytes), bill.id)
 
-            # 2. OCR
+            # 2. OCR: PDFs get text extraction first, then page rendering + image OCR
+            # for scanned PDFs; image files go straight to Vision OCR unchanged.
             logger.info("Running OCR for bill %s", bill.id)
-            ocr_text = ocr_service.ocr_text_from_image(file_bytes)
+            is_pdf = (bill.s3_key or "").lower().endswith(".pdf")
+            if is_pdf:
+                from app.services import pdf_service
+                pdf_text = pdf_service.extract_text_from_pdf(file_bytes)
+                if pdf_text.strip():
+                    logger.info(
+                        "Extracted %d chars of text directly from PDF for bill %s",
+                        len(pdf_text),
+                        bill.id,
+                    )
+                    ocr_text = pdf_text
+                else:
+                    logger.info("PDF for bill %s has no embedded text; rendering pages for OCR", bill.id)
+                    page_texts = [
+                        ocr_service.ocr_text_from_image(page_png)
+                        for page_png in pdf_service.render_pdf_pages(file_bytes)
+                    ]
+                    ocr_text = "\n".join(page_texts)
+            else:
+                ocr_text = ocr_service.ocr_text_from_image(file_bytes)
             extracted = ocr_service.parse_bill_text(ocr_text)
 
             # 2b. Try LLM structuring of the raw OCR text, fall back to regex

@@ -18,6 +18,7 @@ pgvector
 numpy
 scipy
 opencv-python-headless
+pymupdf
 httpx
 python-dotenv
 pytest

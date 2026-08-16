@@ -100,7 +100,11 @@ def _parse_breakup_items(lines: list[str]) -> list[ExtractedItem]:
     time_re = re.compile(r"^\d{1,2}:\d{2}")
     units_re = re.compile(r"^\d{1,4}(?:/\d{1,4})?$")
     paren_re = re.compile(r"^\(.*\)$")
-    header_words = ("particulars", "date & time", "rate", "units", "amount", "code")
+    header_words = (
+        "particulars", "date & time", "rate", "units", "amount", "code",
+        "grand total", "total amount", "net amount", "bill amount",
+        "total payable", "amount payable", "total bill",
+    )
 
     items: list[ExtractedItem] = []
     desc_parts: list[str] = []
@@ -194,15 +198,24 @@ def _extract_grand_total(lines: list[str]) -> float:
         "amount payable",
         "total payable",
     ]
-    price_pattern = re.compile(r"[\d,]+\.?\d*")
+    same_line_price = re.compile(r"[\d,]+\.?\d*")
+    # PDF text extraction often puts the amount on the line after the label
+    next_line_price = re.compile(r"[\d,]+\.\d{1,2}")
 
-    for line in lines:
+    for idx, line in enumerate(lines):
         lower = line.lower()
         if any(kw in lower for kw in total_keywords):
-            prices = price_pattern.findall(line)
+            prices = same_line_price.findall(line)
             if prices:
                 try:
                     return float(prices[-1].replace(",", ""))
                 except ValueError:
                     pass
+            if idx + 1 < len(lines):
+                prices = next_line_price.findall(lines[idx + 1])
+                if prices:
+                    try:
+                        return float(prices[-1].replace(",", ""))
+                    except ValueError:
+                        pass
     return 0.0
