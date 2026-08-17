@@ -38,3 +38,9 @@ app/services/storage/local_uploads/
 
 # GCP service account key — SECRET
 gcp-key.json
+
+# 
+*.pem
+
+# since Makefile contains information about server.
+Makefile

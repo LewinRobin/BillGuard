@@ -5,7 +5,13 @@ module.exports = function (api) {
   plugins.push('react-native-worklets/plugin');
 
   return {
-    presets: [['babel-preset-expo', { jsxImportSource: 'nativewind', unstable_transformProfile: 'hermes-v0' }], 'nativewind/babel'],
+    presets: [
+      [
+        'babel-preset-expo',
+        { jsxImportSource: 'nativewind', unstable_transformProfile: 'hermes-v0' },
+      ],
+      'nativewind/babel',
+    ],
 
     plugins,
   };
