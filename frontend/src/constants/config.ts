@@ -1,6 +1,6 @@
 export const API_BASE_URL = __DEV__
-  ? 'http://127.0.0.1:8000' // replace with your local IP
-  : 'https://api.yourapp.com';
+  ? 'http://127.0.0.1:8000' // local dev server
+  : 'http://YOUR_EC2_PUBLIC_IP:8000'; // TODO: replace with your EC2 public IP after deployment
 
 export const ANOMALY_THRESHOLD = 1.3; // 30% above average
 
