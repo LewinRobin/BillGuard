@@ -1,45 +1,25 @@
-FROM python:3.12-slim AS builder
-
-WORKDIR /app
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq-dev gcc g++ libgl1 libglib2.0-0 && \
-    rm -rf /var/lib/apt/lists/*
-
-# Install CPU-only PyTorch FIRST (~200MB) before sentence-transformers pulls in the CUDA version (~2GB)
-RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Remove any NVIDIA/CUDA libs that may have snuck in as transitive deps
-RUN rm -rf /usr/local/lib/python3.12/site-packages/nvidia \
-           /usr/local/lib/python3.12/site-packages/cublas* \
-           /usr/local/lib/python3.12/site-packages/cudnn* \
-           /usr/local/lib/python3.12/site-packages/nccl* \
-           /usr/local/lib/python3.12/site-packages/cufft* \
-           /usr/local/lib/python3.12/site-packages/curand* \
-           /usr/local/lib/python3.12/site-packages/cusolver* \
-           /usr/local/lib/python3.12/site-packages/cusparse* \
-           /usr/local/lib/python3.12/site-packages/libnv* \
-           /usr/local/lib/python3.12/site-packages/nvjitlink* \
-    2>/dev/null; echo "CUDA cleanup done"
-
-COPY . .
-
-# --- Runtime image (smaller, no compiler) ---
 FROM python:3.12-slim
 
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq5 libgl1 libglib2.0-0 curl && \
+    libpq-dev gcc g++ libgl1 libglib2.0-0 curl && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy installed packages and app from builder
-COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
-COPY --from=builder /app /app
+# Install CPU-only PyTorch first (~200MB vs ~2GB with CUDA)
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Remove NVIDIA/CUDA libs that may have snuck in as transitive deps
+RUN rm -rf /usr/local/lib/python3.12/site-packages/nvidia \
+           /usr/local/lib/python3.12/site-packages/cublas* \
+           /usr/local/lib/python3.12/site-packages/cudnn* \
+           /usr/local/lib/python3.12/site-packages/nccl* \
+    2>/dev/null; echo "CUDA cleanup done"
+
+COPY . .
 
 RUN useradd -m appuser && chown -R appuser:appuser /app
 
