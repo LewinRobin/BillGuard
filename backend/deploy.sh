@@ -21,6 +21,19 @@ fi
 
 echo "Docker version: $(docker --version)"
 
+# --- 1b. Add swap (needed for 1GB RAM with 4 services) ---
+if [ ! -f /swapfile ]; then
+    echo "Creating 2GB swap file..."
+    sudo fallocate -l 2G /swapfile
+    sudo chmod 600 /swapfile
+    sudo mkswap /swapfile
+    sudo swapon /swapfile
+    echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+    sudo sysctl vm.swappiness=10
+    echo 'vm.swappiness=10' | sudo tee -a /etc/sysctl.conf
+    echo "Swap created: $(free -h | grep Swap)"
+fi
+
 # --- 2. Clone / pull code ---
 APP_DIR="/home/ubuntu/BillGuard"
 if [ -d "$APP_DIR/.git" ]; then
