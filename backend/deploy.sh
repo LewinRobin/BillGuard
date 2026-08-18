@@ -13,7 +13,7 @@ echo "=== BillGuard Deployment ==="
 if ! command -v docker &> /dev/null; then
     echo "Installing Docker..."
     sudo apt-get update
-    sudo apt-get install -y docker.io docker-compose-plugin git
+    sudo apt-get install -y docker.io docker-compose-v2 git
     sudo systemctl enable docker
     sudo systemctl start docker
     sudo usermod -aG docker ubuntu
@@ -28,7 +28,7 @@ if [ -d "$APP_DIR/.git" ]; then
     cd "$APP_DIR" && git pull
 else
     echo "Cloning repository..."
-    git clone https://github.com/YOUR_USERNAME/BillGuard.git "$APP_DIR"
+    git clone https://github.com/LewinRobin/BillGuard.git "$APP_DIR"
     cd "$APP_DIR"
 fi
 

@@ -9,7 +9,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Pre-download the sentence-transformers model so first request isn't slow
+# Pre-download the sentence-transformers model (suppress HF telemetry warning)
+ENV HF_HUB_DISABLE_TELEMETRY=1
 RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
 
 COPY . .
@@ -29,9 +30,9 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 COPY --from=builder /app /app
 
 # Copy cached model from builder
-COPY --from=builder /root/.cache/huggingface /root/.cache/huggingface
+RUN useradd -m appuser
+COPY --from=builder --chown=appuser:appuser /root/.cache/huggingface /home/appuser/.cache/huggingface
 
-RUN useradd -m appuser && chown -R appuser:appuser /app /root/.cache
 USER appuser
 
 EXPOSE 8000
