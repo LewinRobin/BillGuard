@@ -9,6 +9,5 @@ gcp-key.json
 tests/
 alembic/
 *.md
-assets/
 .dockerignore
 docker-compose*.yml
